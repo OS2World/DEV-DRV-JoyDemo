@@ -1,0 +1,407 @@
+Advanced OS/2 Joystick Device Driver API Information 1.0
+
+OVERVIEW
+  The Advanced OS/2 Joystick Device Driver API allows an OS/2 application
+  to access the machine's game port, providing it with reliable joystick
+  readings.  We encourage the use of this specification in hopes of providing
+  a common interface for game port facilities in all OS/2 games and other
+  applications.
+
+USAGE SUMMARY
+  Interfacing with the driver is accomplished rather straightforwardly through
+  IOCTL functions after opening the new GAME$ device.
+
+NOTE
+  Versions of the joystick device driver prior to 0.2a only have stub
+  open, read and close routines enabled.  Please be sure to do any testing
+  with version 0.2a or above of the driver.
+
+USAGE EXAMPLES
+
+/****************************************************************************/
+1. Open the device
+
+	HFILE		hGame;
+	ULONG		action;
+	APIRET		rc;
+
+	rc = DosOpen(
+		GAMEPDDNAME,				/* "GAME$" */
+		&hGame,
+		&action,
+		0,
+		FILE_READONLY,
+		FILE_OPEN,
+		OPEN_ACCESS_READONLY | OPEN_SHARE_DENYNONE,
+		NULL);
+	if (rc != 0)
+	{
+		/* ERROR opening device : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+2. Get the version number of the driver
+
+	HFILE		hGame;
+	ULONG		version;
+	ULONG		dataLen;
+	APIRET		rc;
+
+	dataLen = sizeof(version);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_VERSION,	/* 0x80, 0x01 */
+		NULL, 0, NULL,
+		&version, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+3. Get driver parameters
+
+	/*-- below defined in joyos2.h -----------------------------*/
+
+	/* in use bitmasks originating in 1.0 */
+	#define GAME_USE_BOTH_OLDMASK	0x01	/* for backward compat with bool */
+	#define GAME_USE_X_NEWMASK	0x02
+	#define GAME_USE_Y_NEWMASK	0x04
+	#define GAME_USE_X_EITHERMASK	(GAME_USE_X_NEWMASK|GAME_USE_BOTH_OLDMASK)
+	#define GAME_USE_Y_EITHERMASK	(GAME_USE_Y_NEWMASK|GAME_USE_BOTH_OLDMASK)
+	#define GAME_USE_BOTH_NEWMASK	(GAME_USE_X_NEWMASK|GAME_USE_Y_NEWMASK)
+
+	/* only timed sampling implemented in version 1.0 */
+	#define GAME_MODE_TIMED		1	/* timed sampling */
+	#define GAME_MODE_REQUEST	2	/* request driven sampling */
+
+	/* only raw implemented in version 1.0 */
+	#define	GAME_DATA_FORMAT_RAW	1	/* [l,c,r]   */
+	#define	GAME_DATA_FORMAT_SIGNED	2	/* [-l,0,+r] */
+	#define	GAME_DATA_FORMAT_BINARY	3	/* {-1,0,+1} */
+	#define	GAME_DATA_FORMAT_SCALED	4	/* [-10,+10] */
+
+	// parameters defining the operation of the driver
+	typedef struct
+	{
+		USHORT			useA;		/* new bitmasks: see above */
+		USHORT			useB;
+		USHORT			mode;		/* see consts above */
+		USHORT			format;		/* see consts above */
+		USHORT			sampDiv;	/* samp freq = 32 / n */
+		USHORT			scale;		/* scaling factor */
+		USHORT			res1;		/* must be 0 */
+		USHORT			res2;		/* must be 0 */
+	}
+	GAME_PARM_STRUCT;
+
+	/*----------------------------------------------------------*/
+
+	HFILE			hGame;
+	GAME_PARM_STRUCT	gameParms;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameParms);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_PARMS,		/* 0x80, 0x02 */
+		NULL, 0, NULL,
+		&gameParms, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+4. Set driver parameters
+
+	/*-- see section above from joyos2.h -----------------------*/
+
+	HFILE			hGame;
+	GAME_PARM_STRUCT	gameParms;
+	ULONG			parmLen;
+	APIRET			rc;
+
+	parmLen = sizeof(gameParms);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_SET_PARMS,		/* 0x80, 0x03 */
+		&gameParms, parmLen, &parmLen,
+		NULL, 0, NULL);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+5. Get calibration values for joystick(s)
+
+	/*-- below defined in joyos2.h -----------------------------*/
+
+	// 1-D position struct used for each axis
+	typedef	SHORT	GAME_POS;	/* some data formats require signed values */
+
+	// struct to be used for calibration and digital response on each axis
+	typedef struct
+	{
+		GAME_POS		lower;
+		GAME_POS		centre;
+		GAME_POS		upper;
+	}
+	GAME_3POS_STRUCT;
+
+	// calibration values for each axis:
+	//	- upper limit on value to be considered in lower range
+	//	- centre value
+	//	- lower limit on value to be considered in upper range
+	typedef struct
+	{
+		GAME_3POS_STRUCT	Ax;
+		GAME_3POS_STRUCT	Ay;
+		GAME_3POS_STRUCT	Bx;
+		GAME_3POS_STRUCT	By;
+	}
+	GAME_CALIB_STRUCT;
+
+	/*----------------------------------------------------------*/
+
+	HFILE			hGame;
+	GAME_CALIB_STRUCT	gameCalib;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameCalib);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_CALIB,		/* 0x80, 0x04 */
+		NULL, 0, NULL,
+		&gameCalib, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+6. Calibrate joystick(s) (set calibration values)
+
+	/*-- see section above from joyos2.h -----------------------*/
+
+	/*
+	for each stick
+		- tell user to centre joystick and press button
+		- call get status with wait
+		- tell user to move to upper-left and press button
+		- call get status with wait
+		- tell user to move to lower-right and press button
+		- call get status with wait
+
+	then call set calibration IOCTL with these values
+	*/
+
+	HFILE			hGame;
+	GAME_CALIB_STRUCT	gameCalib;
+	ULONG			parmLen;
+	APIRET			rc;
+
+	parmLen = sizeof(gameCalib);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_SET_CALIB,		/* 0x80, 0x05 */
+		&gameCalib, parmLen, &parmLen,
+		NULL, 0, NULL);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+7. Get VDM digital response values for joystick(s)
+
+	/*-- below defined in joyos2.h -----------------------------*/
+
+	// 1-D position struct used for each axis
+	typedef	SHORT	GAME_POS;	/* some data formats require signed values */
+
+	// struct to be used for calibration and digital response on each axis
+	typedef struct
+	{
+		GAME_POS		lower;
+		GAME_POS		centre;
+		GAME_POS		upper;
+	}
+	GAME_3POS_STRUCT;
+
+	// struct defining the digital response values for all axes
+	typedef struct
+	{
+		GAME_3POS_STRUCT	Ax;
+		GAME_3POS_STRUCT	Ay;
+		GAME_3POS_STRUCT	Bx;
+		GAME_3POS_STRUCT	By;
+	}
+	GAME_DIGSET_STRUCT;
+
+	/*----------------------------------------------------------*/
+
+	HFILE			hGame;
+	GAME_DIGSET_STRUCT	gameDigset;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameDigset);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_DIGSET,	/* 0x80, 0x06 */
+		NULL, 0, NULL,
+		&gameDigset, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+8. Set VDM digital response values for joystick(s)
+
+	/*-- see section above from joyos2.h -----------------------*/
+
+	HFILE			hGame;
+	GAME_DIGSET_STRUCT	gameDigset;
+	ULONG			parmLen;
+	APIRET			rc;
+
+	parmLen = sizeof(gameDigset);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_SET_DIGSET,	/* 0x80, 0x07 */
+		&gameDigset, parmLen, &parmLen,
+		NULL, 0, NULL);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+9. Get the status of the joystick(s)
+
+	/*-- below defined in joyos2.h -----------------------------*/
+
+	// 1-D position struct used for each axis
+	typedef	SHORT	GAME_POS;	/* some data formats require signed values */
+
+	// simple 2-D position for each joystick
+	typedef struct
+	{
+		GAME_POS		x;
+		GAME_POS		y;
+	}
+	GAME_2DPOS_STRUCT;
+
+	// struct defining the instantaneous state of both sticks and all buttons
+	typedef struct
+	{
+		GAME_2DPOS_STRUCT	A;
+		GAME_2DPOS_STRUCT	B;
+		USHORT			butMask;
+	}
+	GAME_DATA_STRUCT;
+
+	// status struct returned to OS/2 applications:
+	// current data for all sticks as well as button counts since last read
+	typedef struct
+	{
+		GAME_DATA_STRUCT	curdata;
+		USHORT			b1cnt;
+		USHORT			b2cnt;
+		USHORT			b3cnt;
+		USHORT			b4cnt;
+	}
+	GAME_STATUS_STRUCT;
+
+	/*----------------------------------------------------------*/
+
+	HFILE			hGame;
+	GAME_STATUS_STRUCT	gameStatus;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameStatus);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_STATUS,	/* 0x80, 0x10 */
+		NULL, 0, NULL,
+		&gameStatus, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+10. Get the status of the joystick(s) at next button press
+
+	/*-- see section above from joyos2.h -----------------------*/
+
+	/* NOTE: this call will block */
+
+	HFILE			hGame;
+	GAME_STATUS_STRUCT	gameStatus;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameStatus);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_STATUS_BUTWAIT, /* 0x80, 0x11 */
+		NULL, 0, NULL,
+		&gameStatus, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+11. Get the status of the joystick(s) at next sample (depends on mode)
+
+	/*-- see section above from joyos2.h -----------------------*/
+
+	/* NOTE: this call will block */
+
+	HFILE			hGame;
+	GAME_STATUS_STRUCT	gameStatus;
+	ULONG			dataLen;
+	APIRET			rc;
+
+	dataLen = sizeof(gameStatus);
+	rc = DosDevIOCtl(
+		hGame,
+		IOCTL_CAT_USER, GAME_GET_STATUS_SAMPWAIT, /* 0x80, 0x12 */
+		NULL, 0, NULL,
+		&gameStatus, dataLen, &dataLen);
+	if (rc != 0)
+	{
+		/* ERROR in IOCtl : result code in rc */
+	}
+/****************************************************************************/
+
+/****************************************************************************/
+12. Close the device
+
+	HFILE		hGame;
+	APIRET		rc;
+
+	rc = DosClose(hGame);
+	if (rc != 0)
+	{
+		/* ERROR closing device : result code in rc */
+	}
+/****************************************************************************/

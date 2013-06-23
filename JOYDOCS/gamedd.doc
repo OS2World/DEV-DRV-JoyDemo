@@ -1,0 +1,267 @@
+Advanced OS/2 Joystick Device Driver - Version 1.0
+
+BRIEF
+  The Advanced OS/2 Joystick Device Driver has two main purposes:
+    * To eliminate the joystick response 'flicker' effect seen in many
+      DOS games running under OS/2.
+    * To provide a standard interface for OS/2 game programmers to use
+      the PC joystick port in their products.
+
+      >> Please note that there are also plans to allow DOS applications
+         to speak with the driver, allowing DOS games running under OS/2
+         very efficient and reliable readings of the joystick port.
+
+
+CONTENTS
+  1. Installation
+  2. Usage
+  3. Known Compatibility List
+  4. Known Bugs and Limitations
+  5. Q&A
+  6. History
+
+// 1. INSTALLATION
+
+
+   PLEASE NOTE: If you've installed an older version of this driver (0.1a),
+                you will have to delete the GAMEDD.SYS, GAMEVDD.SYS and
+                GAMEDD.DOC files from your \OS2 directory manually.  Also,
+                please remove references to these drivers from your CONFIG.SYS.
+
+   A. "AUTOMATIC" installation.
+
+       The device driver can be installed using the OS/2 device
+       driver installer.  Follow these steps:
+
+      - If you received the joystick driver as a ZIP file, extract it
+        into a temporary directory.
+
+      - Open your OS/2 System Setup folder and execute 'Device Driver Install',
+        or type 'DDINSTAL' at an OS/2 command prompt.
+
+      - Change the SOURCE DIRECTORY entry to match the temporary directory
+        in which the joystick driver is located.
+
+      - The DESTINATION DIRECTORY should match the root directory of your
+        OS/2 boot drive.
+
+      - When you click on the INSTALL button, the Advanced OS/2 Joystick
+        Driver should appear in a list box.
+
+      - Select the driver by clicking on its name, then click the OK button.
+        This will copy the device driver files into a directory named MPCA on
+        the root of your boot drive and add the device driver loading lines to
+        your CONFIG.SYS
+
+      - You can now exit the Device Driver Install program and reboot
+        your OS/2 system to enable the driver.
+
+   B. "MANUAL" installation.
+
+      - Create a directory on the root of your boot drive named MPCA.
+
+      - If you received the joystick driver as a ZIP file, extract it
+        into the MPCA directory, otherwise, copy all the driver files
+        into that directory.
+
+      - Add the following lines to your CONFIG.SYS file:
+
+		DEVICE=x:\mpca\gamedd.sys
+		DEVICE=x:\mpca\gamevdd.sys
+
+        (replacing 'x' with the letter of your boot drive, of course)
+
+      - Reboot your system to enable the driver.
+
+
+// 2. USAGE
+
+   The driver adds two options to your DOS SETTINGS notebook.
+   To change these options, simply bring up the settings notebook
+   for a particular DOS session icon, choose the SESSION tab, and click
+   on the DOS SETTINGS button.
+
+   GAME_DIRECT_ACCESS
+
+	ON - This setting essentially disables the driver by giving the
+             DOS program direct access to the game port.  You should only
+             enable this setting if you're having problems with control
+             of a DOS game and suspect that the joystick driver may be
+             at fault.  This is also useful for testing the difference
+             between having the driver enabled and disabled for a particular
+             game.
+
+       OFF - The default setting.  This prevents the DOS program from talking
+             directly to the game port, and thus allows the joystick driver
+             to do its work.
+
+   GAME_DIGITAL_RESPONSE
+
+        ON - The default setting.  When this option is enabled, the driver
+             reports information back to the DOS program in such a way as
+             to make your joystick look like a GamePad, even if your joystick
+             is analog.
+
+       OFF - Analog joysticks will look like analog joysticks ...
+
+
+   MANUAL RESPONSE SETTINGS ADJUSTMENT 
+
+	The values that the driver returns to the application using it
+	can be manually adjusted in case of unusual behavior.  For example,
+	some games may act as if the joystick is being held constantly toward
+	one direction.  If this happens, switch out of the running DOS
+	application (by using CTRL-ESC, for example) and execute the
+	JOYTUNE.EXE program found in the MPCA subdirectory.
+
+	The program will display the values the joystick driver currently
+	responds with when in DIGITAL RESPONSE mode.  If you choose to change
+	these values, you will be prompted first for X-axis values, followed
+	by Y-axis values.  Enter three numbers for each axis, representing
+	the values which should be returned to the game or application.
+
+	Modifying these values may improve or resolve odd joystick response
+	problems.  For example, if your program acts as if the joystick
+	is being held constantly towards the upper-left, then values the
+	joystick driver is returning for the 'centered' position are too
+	low for each axis.  Try raising the middle value for each axis using
+	JOYTUNE.  You'll likely need to adjust the other values as well.
+	In most cases, you'll be able to simply switch back and forth between
+	the game you're trying to use and the JOYTUNE program until the
+	adjustment is refined.
+
+	There are plans for a more user-friendly version of JOYTUNE soon,
+	which would include the ability to save your modifications for
+	future use.
+
+
+// 3. KNOWN COMPATIBILITY LIST
+
+   The following is a list of games which have been tested with this
+   driver.  We may expand this list as more information becomes available,
+   so please let us know what *your* results are.
+
+   PLEASE NOTE THAT DUE TO DIFFERENCES IN SYSTEM HARDWARE, YOUR RESULTS
+   *MAY* BE DIFFERENT FROM THOSE SHOWN HERE!  (YMMV)
+
+
+GAME                    VER.   RATING    NOTES
+------------------------------------------------------------------------------
+Alien Carnage		1.0	0	Plays well w-w/o driver.
+Boppin			1.1	0	Useless w-w/o driver.
+Commander Keen		4	2
+Doom II			1.7	0	Locks up w-w/o driver.
+Falcon			3.0	2	Was ok before - solid now.
+Jazz Jackrabit		1.0	2
+Line Wars II		1.04	2	Solid.  Some flicker before.
+Lion King		NA	2
+Magic Carpet		NA	2
+MS Flight Simulator	5.0a	1	Better, but still some flicker.
+Mortal Kombat		1.0	0	Useless w-w/o driver.
+NASCAR Racing		NA	2
+One Must Fall		1.0	2
+Rampart			NA	2
+Raptor			1.0	2
+Star Control II		NA	2	Unusable before - great now.
+SVGA Air Warrior	1.16b	-1	Flicker worse with than without.
+Tie Fighter		NA	2
+X-Wing 1 (3.5")		NA	2
+
+NOTES
+---------------------
++2. Works solidly now - had problems without driver.
++1. Some improvement - game is better with driver, but still has problems.
+ 0. Driver provided no noticeable improvement.
+-1. Game works somewhat better *without* the driver.
+-2. Driver makes the game unplayable, works much better without it.
+
+
+// 4. KNOWN BUGS AND LIMITATIONS
+
+   There are currently no known bugs with the driver itself.
+
+   There seems to be a limitation in the number of option settings which
+   can be added to the DOS SETTINGS notebook.  If nothing happens when
+   you click on the DOS SETTINGS button, then you've most likely run into
+   this limitation.  Our only suggestion at this point is that you
+   remove other virtual device drivers which add options to this notebook
+   from your CONFIG.SYS.  If you're using Ray Gwinn's SIO driver but
+   don't have any DOS programs which really need it, then the VSIO.SYS
+   virtual device driver is a good candidate since it adds *many* options
+   to the notebook.
+
+   The following is a list of games which will *not* work with joystick
+   support under OS/2 at all.  Unfortunately, the driver can't do anything
+   about fixing these problems.  Since the great majority of games *do*
+   work with a joystick under OS/2, we suggest you contact the authors of
+   the game in question and ask them to fix the problem.  Given enough such
+   requests, it is possible that they may actually do something about it.
+
+	DOOM II: The game will simply stop at its title screen if you
+                 configure it for joystick use.  No amount of coaxing seems
+                 to change its mind.  Considering that sound effects don't
+                 work under OS/2 either, it almost seems as if Id is
+                 purposefully trying to make life difficult for OS/2 users ...
+
+
+// 5. Q&A
+
+   Q: Does this driver add extra overhead to my OS/2 system?
+   A: The driver needs to poll the game port for new joystick information.
+      However, it only does this when an application (game) is using it and
+      is idle otherwise.
+
+   Q: Will this driver conflict with the WatchCat monitor program?
+   A: No.  Be aware that WatchCat will still be checking the joystick
+      buttons, even while games are running.  We suggest you start
+      WatchCat with the /GA option, which would require you to press all
+      joystick buttons simultaneously to start WatchCat.  Alternately,
+      you could disable WatchCat before starting a game and re-enable it
+      afterwards using the TOGGLE option.  Check the WatchCat documentation.
+      Please note that WatchCat 2.0 does not have an option equivalent to
+      the /GA in previous versions.  The authors are aware of this and
+      said they would add it again in a later release.
+
+   Q: Doom II just locks up at the title screen!  What's wrong?
+   A: Read the KNOWN BUGS AND LIMITATIONS section above.
+
+   Q: Nothing happens when I click on the DOS SETTINGS button!  What's wrong?
+   A: Read the KNOWN BUGS AND LIMITATIONS section above.
+
+   Q: Will the driver work with the XYZ joystick??
+   A: The driver is not designed to work with a particular kind of joystick.
+      It simply reads the joystick *port* for position information and
+      feeds that back to the DOS program at the appropriate time.  It is then
+      up to your program to interpret the data correctly.  If you're having
+      problems with a particular kind of joystick, please contact us
+      at the address below.
+
+   Q: Will this driver only work with the Gravis UltraSound?
+   A: No.  It is a general-purpose driver which should work with
+      any standard game adapter.
+
+   Q: Why don't the driver's DOS SETTINGS have descriptions in the settings
+      notebook?
+   A: It appears to be impossible for third-party virtual device drivers
+      to add descriptions to their settings within the DOS SETTINGS notebook.
+      Bug IBM about it!
+
+
+// 6. HISTORY
+
+   Ver 0.1a [12/94]
+	- First public release.
+
+   Ver 0.2a [01/95]
+	- Game port polling increased to improve responsiveness.
+	- OS/2 API specifications released.
+        - Possible bug fixed which caused flicker every minute or so.
+	- Digital response tuning app. introduced.
+
+   Ver 0.2b [02/95]
+	- Enhanced driver to work with throttle controls on advanced sticks
+	- Modified sample test program to reflect this enhancement
+	  (sources compatible with ver 0.2a)
+
+   Ver 1.0 [04/95]
+	- first commercial version

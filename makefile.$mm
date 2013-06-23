@@ -1,0 +1,23 @@
+:TARGET.SUFFIXES
+:DEPENDENCY..c .obj 
+:TARGET.all
+:DEPENDENCY.
+E:\C_Projects\Joystick_Source\joystick.exe
+:RULE..c.obj
+:ACTION.Compile::C++ Compiler
+:COMMAND.
+icc.exe /Tdp /Ti /Fo"%|dpfF.obj" /C %s
+:TARGET.E:\C_Projects\Joystick_Source\joystick.exe
+:DEPENDENCY.
+E:\C_Projects\Joystick_Source\joytest.obj
+:ACTION.Link::Linker
+:COMMAND.
+icc.exe @<<
+ /B" /de"
+ /FeE:\C_Projects\Joystick_Source\joystick.exe 
+ E:\C_Projects\Joystick_Source\joytest.obj
+<<
+:TARGET.E:\C_Projects\Joystick_Source\joytest.obj
+:DEPENDENCY.
+E:\C_Projects\Joystick_Source\joytest.c
+{E:\C_Projects\Joystick_Source;$(INCLUDE);}joyos2.h

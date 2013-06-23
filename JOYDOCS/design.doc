@@ -1,0 +1,176 @@
+The Advanced OS/2 Joystick Device Driver Design Overview Document
+
+INTRODUCTION
+
+The IBM PC game port adapter provides a simple interface to joysticks and
+other similar analog devices.  The status of up to 4 analog and 4 digital
+signals is read through I/O port address 201h.  Two analog and two digital
+signals are commonly grouped together in the form of a dual axis joystick
+with two "fire" buttons.  Some modern joysticks use two axes for movement
+and an additional axis for throttle.
+
+Each analog and digital signal is assigned one bit in the game adapter port.
+A low (binary zero) value for a bit connected to a joystick button is
+returned when that button is depressed.  Bits representing analog signals
+are implemented as one-shot outputs.  All one-shots are fired when the I/O
+port is written to and remain high until an RC timing circuit decays.  The
+variable position of each joystick axis provides the neccessary resistance
+for this delay circuit.  If a joystick axis is not connected, the infinite
+resistance across that signal holds the one-shot high indefinitely.
+
+Determining the position of each joystick axis is done by measuring the
+duration of the high state for each one-shot.  Two methods are commonly
+used to measure this duration: counting loop iterations and reading the
+hardware timer.  Although the iterative method is dependant on the speed
+of the processor, with proper calibration of each axis this limitation
+becomes irrelevant.  This is the method chosen to sample the game port
+adapter in this driver.
+
+The execution of a DOS application inside an OS/2 VDM is controlled by the
+operating system.  As just one of many tasks being handled by the scheduler,
+the DOS application can be switched away from at any moment to be returned
+to that point at some later time.  If this occurs when the joysticks are
+being read by either of the above two methods, the result is catastrophic.
+In the case of the iterative method, the suspending of execution causes the
+sampling procedure to terminate early and return low values for all axes.
+On the other hand, the delay introduced by the suspension of execution has
+the opposite effect on the timed sampling method in that the value read from
+the timer chip is incorrectly high.  In either case, the effect the user
+sees is that of the joystick "flickering" from the correct position making
+the device unusable.
+
+One of the primary functions of this driver is to provide a remedy to this
+problem for DOS applications using the iterative sampling method.  Not only
+is this method of reading the port substantially more common, but providing
+a fix is also much more feasible (selectively returning fabricated values
+from an emulated timer chip could have other more dramatic side effects
+making this procedure inadvisable).  The solution is as simple as returning
+high-values to the DOS application for each of the one-shot outputs until
+the correct count has been reached.  The counts are determined as part of
+the normal sampling procedure inside the real-time clock timer handler.
+
+Given that OS/2 does not provide an API for reading joysticks, the obvious
+other function of this driver is to define and implement an interface.  The
+generic IOCTL interface was chosen as the method of communication with the
+driver for its ability to transfer specific packets of information to/from
+the application.  Since this component of the driver is simpler than the
+"flicker" reduction component while also supplying a large part of its
+functionality, it will be discussed in detail first.
+
+
+OS/2 API
+
+Defining and implementing an API for OS/2 applications is one of the two
+primary functions of this driver.  After opening the device, applications
+communicate with the driver via the OS/2 device IOCTL interface.  Functions
+are provided for getting and setting device parameters, reading the state
+of the devices connected, and calibrating those devices.
+
+The driver samples the game port adapter inside the real-time clock timer
+handler.  This handler is registered with the OS at device initialization
+and is called every 32 milliseconds thereafter.  It determines if the game
+adapter port requires sampling based on client demand and the current
+sampling rate.  Client demand for the sampling procedure only exists if an
+OS/2 app has the device open or if a VDM is emulating the port (see
+"FLICKER" REDUCTION section).
+
+The joysticks connected are determined and calibrated as part of the
+device initialization.  These parameters can be modified by an OS/2 app
+or refreshed through a calibration IOCTL request.
+
+In addition to the standard device read function, functions are also defined
+for returning the state of the device connected at the next button press or
+at the next timed read.  These functions block the calling process until the
+given event occurs when the process is run from inside the timer handler.
+
+
+"FLICKER" REDUCTION
+
+As explained earlier, the pre-emptive multi-tasking nature of OS/2 can
+cause DOS applications reading the game adapter port to deduce incorrect
+positions for the joysticks connected.  The solution implemented in this
+driver to this problem is to regularly sample the game adapter port inside
+the Physical Device Driver (PDD) and then return fabricated values to the
+DOS app that reflect that state.  With the logic for regularly sampling
+the port already in the PDD, all that must be done in that regard is to
+activate that procedure.
+
+Before any of this can be initiated, the first thing that must be done is
+to trap any access to the game port by the DOS application.  Any time I/O
+ports are to be trapped or emulated, an OS/2 Virtual Device Driver (VDD) is
+required.  The VDD works in conjunction with the PDD to provide the device
+emulation by capturing port reads and returning values that reflect the
+current state as determined by the PDD.  The VDD is also responsible for
+determining if a given VDM is to have direct access to the port and if so,
+to obtain owership of it.
+
+At device initialization, the VDD first opens the PDD and then retrieves
+a pointer to the data area which will be used to store the current state
+of the device.  The next job for the VDD comes when a DOS session is started
+at which time it hooks the I/O port for the game adapter.  Knowing that
+the device must be written to by the CPU to fire the one-shots before the
+read sequence can begin, the hook handler for the write operation is the
+function where device ownership or emulation is resolved.
+
+If the "GAME_DIRECT_ACCESS" DOS property is "ON" for that session, this
+specifies that the device is to be directly accessed by the VDM.  In this
+case, the VDD must first obtain ownership of the device before allowing
+this operation to proceed.  Device ownership is one of the more complex
+issues handled by this driver.  It first involves getting permission from
+the PDD which can only be granted if the device is presently unused either
+by an OS/2 app or by another VDM through the emulation system.  If not
+available, the user is given the choice to to kill the session, wait for the
+device to become free, or ignore that error and use the device in emulation
+mode.  If the user chooses to wait for the device to become free, the DOS
+session process will be blocked on an event semaphore to be posted when
+the device is available.
+
+Once the VDD is granted ownership of the device by the PDD, it then must
+arbitrate final ownership amongst all VDMs competing for it.  A mutual
+exclusion (MUTEX) semaphore is used as the final decision maker in this
+process and the VDM which is granted ownership of it is given the same
+status with game adapter port.  When the DOS application which owns the
+device terminates, this MUTEX is released allowing any other VDMs waiting
+for it to compete for ownership once again.  If no VDMs are waiting, the
+ownership of the device is returned to none through a call to the PDD.
+
+When the "GAME_DIRECT_ACCESS" property for a VDM is in its default state
+of "OFF" and the game adapter port is written to, the emulation system
+is activated.  First the VDD informs the PDD that it wishes to become a
+client of the sampling procedure.  If no other clients are already active,
+this request forces an initial sampling so that valid data is immediately
+available to the VDD.  Next the VDD copies the game port data from the
+PDD space to its own VDM instance data area using the pointer retrieved
+at initialization.  This copy of the data will be used when the DOS app
+reads the game port.
+
+Next, the emulation system uses the other DOS property registered at
+initialization: "GAME_DIGITAL_RESPONSE".  If set to "ON", the joysticks
+connected are emulated as fixed resistance style joysticks such as the
+Gravis GamePad (*).  In this case, the values for each axis are selected
+from a field in the PDD data area which corresponds to the range the actual
+value is presently within.  That is, if the current value for an axis is
+less than the upper limit for the lower range, a given fixed value for the
+lower range is chosen.
+
+With the given value for each axis in hand, the VDD is ready to emulate
+the game port adapter when read by the DOS application.  First the count
+on the number of reads is zeroed as the last operation in the port write
+handler.  When the port read handler is called, the value for each axis
+is compared against the number of reads by this VDM and if greater, a one
+for that bit is generated.  The state of each position bit mirrors the
+value returned by the actual hardware when the PDD last sampled it on that
+iteration.  The bits for each of the buttons is retrieved from the PDD
+data area and used in generating the byte returned.  This information
+is transferred on each read to maintain a "freshness" in the button data.
+
+
+FUTURE DIRECTIONS
+
+Future directions for this driver may include a high-performance interface
+for DOS applications.  Not only would this remove the inefficient sampling
+loop making the DOS app run faster, but it could also be used to implement
+a more effective multi-tasking system by suspending the task altogether.
+
+
+(*) Registered trademark of Advanced Gravis Technologies
